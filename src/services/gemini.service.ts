@@ -1,3 +1,4 @@
+
 import { Injectable, inject } from '@angular/core';
 import { GoogleGenAI, GenerateContentResponse, Type } from '@google/genai';
 import { ScheduleService } from './schedule.service';
@@ -10,10 +11,20 @@ import { ScheduleItem } from '../models/schedule.model';
 })
 export class GeminiService {
   private ai: GoogleGenAI | null = null;
+  private apiKeyChecked = false; // Flag to prevent repeated checks
   private scheduleService = inject(ScheduleService);
   private mcpService = inject(McpService);
 
   constructor() {
+    // Initialization is deferred to be more resilient to environment variable timing.
+  }
+
+  private initializeAi(): void {
+    if (this.ai || this.apiKeyChecked) {
+      return; // Already initialized or we already know the key is missing
+    }
+
+    this.apiKeyChecked = true;
     // The API key is obtained exclusively from the environment variable `process.env.API_KEY`.
     const apiKey = process.env.API_KEY;
     if (apiKey) {
@@ -24,6 +35,8 @@ export class GeminiService {
   }
 
   async generateResponse(prompt: string): Promise<string | { response: string; followUpQuestions: string[] } | { action: 'PROMPT_FOR_CANCELLATION', data: any }> {
+    this.initializeAi(); // Initialize AI client just-in-time
+
     if (!this.ai) {
       return "The AI assistant is currently unavailable. Please ensure the API key is configured correctly by the administrator.";
     }
