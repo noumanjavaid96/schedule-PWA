@@ -10,7 +10,7 @@ bootstrapApplication(AppComponent, {
   providers: [
     provideZonelessChangeDetection(),
     provideHttpClient(),
-    provideServiceWorker('/ngsw-worker.js', {
+    provideServiceWorker('ngsw-worker.js', {
         enabled: true,
         // Register the ServiceWorker as soon as the application is stable
         // or after 30 seconds (whichever comes first).

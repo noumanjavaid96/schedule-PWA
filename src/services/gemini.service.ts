@@ -5,8 +5,6 @@ import { McpService } from './mcp.service';
 import { ScheduleItem } from '../models/schedule.model';
 
 // IMPORTANT: This service assumes the API key is available via process.env.API_KEY
-// In a real application, this should be handled securely.
-
 @Injectable({
   providedIn: 'root',
 })
@@ -16,19 +14,18 @@ export class GeminiService {
   private mcpService = inject(McpService);
 
   constructor() {
-    // This is a placeholder for the API key.
-    // In the target environment, `process.env.API_KEY` is expected to be available.
-    const apiKey = (window as any).process?.env?.API_KEY ?? prompt("Enter your Gemini API Key:");
+    // The API key is obtained exclusively from the environment variable `process.env.API_KEY`.
+    const apiKey = process.env.API_KEY;
     if (apiKey) {
-        this.ai = new GoogleGenAI({ apiKey });
+      this.ai = new GoogleGenAI({ apiKey });
     } else {
-        console.error("API Key not found. Please provide it to use the AI features.");
+      console.error("Gemini API Key not found in process.env.API_KEY. AI features will be disabled.");
     }
   }
 
   async generateResponse(prompt: string): Promise<string | { response: string; followUpQuestions: string[] } | { action: 'PROMPT_FOR_CANCELLATION', data: any }> {
     if (!this.ai) {
-      return "Gemini AI client is not initialized. Please check your API key.";
+      return "The AI assistant is currently unavailable. Please ensure the API key is configured correctly by the administrator.";
     }
 
     const model = 'gemini-2.5-flash';
