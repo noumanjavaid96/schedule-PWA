@@ -87,35 +87,37 @@ If you cannot perform a request, explain why in a conversational response, follo
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           config: {
             systemInstruction: systemInstruction,
+            responseMimeType: "application/json", // Enforce JSON output
           }
       });
       
       const responseText = response.text.trim();
       
-      if (responseText.startsWith('{') && responseText.endsWith('}')) {
-        try {
-          const jsonResponse = JSON.parse(responseText);
-          
-          if (jsonResponse.action === 'PROMPT_FOR_CANCELLATION' && jsonResponse.data) {
-             // Pass only the relevant sessions to the UI
-            jsonResponse.data.sessions = cancellableSchedule;
-            return jsonResponse;
-          }
-          
-          if (jsonResponse.tool_name && jsonResponse.arguments) {
-            return await this.handleToolCall(jsonResponse.tool_name, jsonResponse.arguments);
-          }
-          
-          if (jsonResponse.response && Array.isArray(jsonResponse.followUpQuestions)) {
-            return jsonResponse;
-          }
-
-        } catch (e) {
-          console.warn("Response looked like JSON but failed to parse or match format.", e);
+      try {
+        const jsonResponse = JSON.parse(responseText);
+        
+        if (jsonResponse.action === 'PROMPT_FOR_CANCELLATION' && jsonResponse.data) {
+            // Pass only the relevant sessions to the UI
+          jsonResponse.data.sessions = cancellableSchedule;
+          return jsonResponse;
         }
+        
+        if (jsonResponse.tool_name && jsonResponse.arguments) {
+          return await this.handleToolCall(jsonResponse.tool_name, jsonResponse.arguments);
+        }
+        
+        if (jsonResponse.response && Array.isArray(jsonResponse.followUpQuestions)) {
+          return jsonResponse;
+        }
+        
+        // Fallback for valid JSON that doesn't match our expected structures
+        console.error('AI returned valid JSON but with an unknown format:', jsonResponse);
+        return `Sorry, I received an unexpected response from the AI. Please try rephrasing your request.`;
+
+      } catch (e) {
+        console.error("Failed to parse JSON response from Gemini:", e, "\nRaw response:", responseText);
+        return 'Sorry, I had trouble understanding the AI\'s response. Please try again.';
       }
-      
-      return responseText;
 
     } catch (error) {
       console.error('Error generating response from Gemini:', error);
