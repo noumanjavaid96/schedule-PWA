@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, effect } from '@angular/core';
-import { ScheduleComponent } from './components/schedule/schedule.component';
-import { ChatComponent } from './components/chat/chat.component';
-import { McpService } from './services/mcp.service';
+import { ScheduleComponent } from './components/schedule/schedule.component.js';
+import { ChatComponent } from './components/chat/chat.component.js';
+import { McpService } from './services/mcp.service.js';
 
 @Component({
   selector: 'app-root',
@@ -13,7 +13,7 @@ export class AppComponent {
   mcpService = inject(McpService);
   notification = this.mcpService.notification;
 
-  activeView = signal<'schedule' | 'chat'>('schedule');
+  activeView = signal('schedule');
   isDarkMode = signal(false);
 
   constructor() {
@@ -30,11 +30,11 @@ export class AppComponent {
     return this.activeView() === 'schedule' ? 'Upcoming Sessions' : 'AI Assistant';
   });
 
-  setView(view: 'schedule' | 'chat'): void {
+  setView(view) {
     this.activeView.set(view);
   }
 
-  toggleDarkMode(): void {
+  toggleDarkMode() {
     this.isDarkMode.update(value => !value);
   }
 }

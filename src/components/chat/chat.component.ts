@@ -1,17 +1,16 @@
-import { Component, ChangeDetectionStrategy, inject, signal, ElementRef, viewChild, afterNextRender } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, viewChild, afterNextRender, ElementRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
-import { ChatMessage, ScheduleItem } from '../../models/schedule.model';
-import { GeminiService } from '../../services/gemini.service';
+import { GeminiService } from '../../services/gemini.service.js';
+import { ChatMessage, ScheduleItem } from '../../models/schedule.model.js';
 
 @Component({
   selector: 'app-chat',
   templateUrl: './chat.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
 })
 export class ChatComponent {
-  private geminiService = inject(GeminiService);
+  geminiService = inject(GeminiService);
   
   messages = signal<ChatMessage[]>([
     { role: 'model', content: "Hello Admin! Welcome to the SG School Trainer Hub. You can manage all trainer schedules here. How can I assist you?", followUpQuestions: ["What's on the schedule for today?", "Are there any pending sessions?", "I need to cancel a session."] }
@@ -27,40 +26,45 @@ export class ChatComponent {
     });
   }
 
-  async sendMessage(): Promise<void> {
+  async sendMessage() {
     const userMessage = this.userInput().trim();
     if (!userMessage) return;
     this.userInput.set('');
     await this.processMessage(userMessage);
   }
 
-  async sendSuggestedQuestion(question: string): Promise<void> {
+  async sendSuggestedQuestion(question: string) {
     await this.processMessage(question);
   }
   
-  async selectSession(session: ScheduleItem, action: 'cancel'): Promise<void> {
+  async selectSession(session: ScheduleItem, action: string) {
     if (action === 'cancel') {
         const message = `I want to cancel the session at ${session.schoolName} on ${new Date(session.date).toLocaleDateString()} (ID: ${session.id}).`;
         await this.processMessage(message);
     }
   }
 
-  formatSessionDate(dateString: string): string {
+  formatSessionDate(dateString: string) {
     return new Date(dateString).toDateString();
   }
 
-  private async processMessage(message: string): Promise<void> {
+  async processMessage(message: string) {
     if (this.isLoading()) return;
 
-    // Add user message to chat, clearing previous suggestions/actions
-    this.messages.update(m => {
-      if (m.length > 0) {
-        m[m.length - 1].followUpQuestions = [];
-        m[m.length - 1].action = undefined;
-        m[m.length - 1].actionData = undefined;
+    // Immutably update messages: clear follow-ups from the last model message, then add the new user message.
+    this.messages.update(currentMessages => {
+      let newMessages = [...currentMessages];
+      if (newMessages.length > 0 && newMessages[newMessages.length - 1].role === 'model') {
+        const lastMessage = { ...newMessages[newMessages.length - 1] };
+        // Remove interactive elements for a clean history
+        delete lastMessage.followUpQuestions;
+        delete lastMessage.action;
+        delete lastMessage.actionData;
+        newMessages[newMessages.length - 1] = lastMessage;
       }
-      return [...m, { role: 'user', content: message }];
+      return [...newMessages, { role: 'user', content: message }];
     });
+
 
     this.isLoading.set(true);
     this.messages.update(m => [...m, { role: 'model', content: '', isLoading: true }]);
@@ -73,29 +77,28 @@ export class ChatComponent {
 
       if (typeof response === 'string') {
         newModelMessage = { role: 'model', content: response };
-      } else if ('action' in response) {
+      } else if (response && 'action' in response) {
         newModelMessage = { role: 'model', content: response.data.prompt, action: response.action, actionData: response.data };
-      } else {
+      } else if (response && 'response' in response) {
         newModelMessage = { role: 'model', content: response.response, followUpQuestions: response.followUpQuestions };
+      } else {
+        // Fallback for unexpected response structure
+        newModelMessage = { role: 'model', content: 'Sorry, I received an unexpected response.' };
       }
 
-      this.messages.update(m => {
-        m.pop(); // Remove loader
-        return [...m, newModelMessage];
-      });
+      // Replace the loader with the new message immutably
+      this.messages.update(m => [...m.slice(0, -1), newModelMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
-      this.messages.update(m => {
-        m.pop(); // Remove loader
-        return [...m, { role: 'model', content: 'Sorry, I ran into a problem. Please try again.' }];
-      });
+      // Replace the loader with an error message immutably
+      this.messages.update(m => [...m.slice(0, -1), { role: 'model', content: 'Sorry, I ran into a problem. Please try again.' }]);
     } finally {
       this.isLoading.set(false);
       this.scrollToBottom();
     }
   }
 
-  private scrollToBottom(): void {
+  scrollToBottom() {
     setTimeout(() => {
       const container = this.chatContainer()?.nativeElement;
       if (container) {

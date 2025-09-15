@@ -1,13 +1,12 @@
 import { Injectable, signal } from '@angular/core';
-import { ScheduleItem } from '../models/schedule.model';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ScheduleService {
   // Initial "Foo data"
-  private initialSchedule: ScheduleItem[] = [
-    { id: 1, schoolName: 'Raffles Institution', topic: 'Advanced Robotics Workshop', date: this.getTodayString(), time: '10:00', status: 'Confirmed', trainer: 'John Doe' },
+  initialSchedule = [
+    { id: 1, schoolName: 'Raffles Institution', topic: 'Advanced Robotics Workshop', date: this.getTodayString(), time: '10:00', status: 'Confirmed', trainer: 'John Doe', reminderMinutes: 30 },
     { id: 2, schoolName: 'Hwa Chong Institution', topic: 'Intro to Python for Sec 1', date: this.getTodayString(), time: '14:00', status: 'Confirmed', trainer: 'Jane Smith' },
     { id: 3, schoolName: 'National Junior College', topic: 'Cybersecurity Basics', date: this.getTomorrowString(), time: '09:30', status: 'Pending', trainer: 'Alex Tan' },
     { id: 4, schoolName: 'Anglo-Chinese School (Independent)', topic: 'AI in Education Seminar', date: this.getTomorrowString(), time: '13:00', status: 'Confirmed', trainer: 'Emily Carter' },
@@ -16,48 +15,48 @@ export class ScheduleService {
     { id: 7, schoolName: 'Nanyang Girls\' High School', topic: 'Mobile App Design Principles', date: this.getInThreeDaysString(), time: '10:30', status: 'Confirmed', trainer: 'David Lee' },
   ];
 
-  schedule = signal<ScheduleItem[]>(this.initialSchedule);
+  schedule = signal(this.initialSchedule);
 
-  private getDateString(offset: number): string {
+  getDateString(offset) {
       const aDate = new Date();
       aDate.setDate(aDate.getDate() + offset);
       return aDate.toISOString().split('T')[0];
   }
 
-  private getTodayString(): string {
+  getTodayString() {
       return this.getDateString(0);
   }
 
-  private getTomorrowString(): string {
+  getTomorrowString() {
       return this.getDateString(1);
   }
 
-  private getInTwoDaysString(): string {
+  getInTwoDaysString() {
       return this.getDateString(2);
   }
 
-    private getInThreeDaysString(): string {
+    getInThreeDaysString() {
       return this.getDateString(3);
   }
 
-  getSchedule(): ScheduleItem[] {
+  getSchedule() {
     return this.schedule();
   }
 
-  addScheduleItem(item: Omit<ScheduleItem, 'id'>) {
+  addScheduleItem(item) {
     this.schedule.update(currentSchedule => {
       const newId = currentSchedule.length > 0 ? Math.max(...currentSchedule.map(i => i.id)) + 1 : 1;
       return [...currentSchedule, { ...item, id: newId }];
     });
   }
 
-  updateScheduleItem(updatedItem: ScheduleItem) {
+  updateScheduleItem(updatedItem) {
     this.schedule.update(currentSchedule => 
       currentSchedule.map(item => item.id === updatedItem.id ? updatedItem : item)
     );
   }
 
-  deleteScheduleItem(id: number) {
+  deleteScheduleItem(id) {
     this.schedule.update(currentSchedule => 
       currentSchedule.filter(item => item.id !== id)
     );

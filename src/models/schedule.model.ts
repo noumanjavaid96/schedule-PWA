@@ -7,6 +7,7 @@ export interface ScheduleItem {
   status: 'Confirmed' | 'Pending' | 'Cancelled';
   trainer: string;
   cancellationReason?: string;
+  reminderMinutes?: number;
 }
 
 export interface ChatMessage {

@@ -1,26 +1,23 @@
-
-
 import { Injectable, inject } from '@angular/core';
-import { GoogleGenAI, GenerateContentResponse, Type } from '@google/genai';
-import { ScheduleService } from './schedule.service';
-import { McpService } from './mcp.service';
-import { ScheduleItem } from '../models/schedule.model';
+import { GoogleGenAI } from '@google/genai';
+import { ScheduleService } from './schedule.service.js';
+import { McpService } from './mcp.service.js';
 
 // IMPORTANT: This service assumes the API key is available via process.env.API_KEY
 @Injectable({
   providedIn: 'root',
 })
 export class GeminiService {
-  private ai: GoogleGenAI | null = null;
-  private apiKeyChecked = false; // Flag to prevent repeated checks
-  private scheduleService = inject(ScheduleService);
-  private mcpService = inject(McpService);
+  ai = null;
+  apiKeyChecked = false; // Flag to prevent repeated checks
+  scheduleService = inject(ScheduleService);
+  mcpService = inject(McpService);
 
   constructor() {
     // Initialization is deferred to be more resilient to environment variable timing.
   }
 
-  private initializeAi(): void {
+  initializeAi() {
     if (this.ai || this.apiKeyChecked) {
       return; // Already initialized or we already know the key is missing
     }
@@ -35,14 +32,14 @@ export class GeminiService {
     }
   }
 
-  async generateResponse(prompt: string): Promise<string | { response: string; followUpQuestions: string[] } | { action: 'PROMPT_FOR_CANCELLATION', data: any }> {
+  async generateResponse(prompt) {
     this.initializeAi(); // Initialize AI client just-in-time
 
     if (!this.ai) {
       return "The AI assistant is currently unavailable. Please ensure the API key is configured correctly by the administrator.";
     }
 
-    const model = 'gemini-2.5-flash';
+    const model = 'gemini-2.5-flash-lite';
     const schedule = this.scheduleService.getSchedule();
     const cancellableSchedule = schedule.filter(item => item.status === 'Confirmed' || item.status === 'Pending');
     const scheduleContext = JSON.stringify(schedule, null, 2);
@@ -57,7 +54,7 @@ SCHEDULE:
 ${scheduleContext}
 
 You have access to two tools:
-1. 'update_schedule': Use this to add, modify, or delete a training session. The arguments object should match the ScheduleItem structure. For modifications, you MUST provide the 'id'.
+1. 'update_schedule': Use this to add, modify, or delete a training session. The arguments object should match the ScheduleItem structure. For modifications, you MUST provide the 'id'. To set a reminder, provide the 'id' and 'reminderMinutes' (e.g., {"id": 2, "reminderMinutes": 30}).
    - **CRITICAL CANCELLATION RULE:** If a user requests to cancel a session, you MUST ask for a detailed reason for the cancellation before using this tool.
 
 2. 'send_notification': Use this to send a notification to the user.
@@ -71,7 +68,8 @@ You have access to two tools:
 
 2.  **If you need to use a tool:** Respond ONLY with a single JSON object for the tool call.
     *   **Format:** \`{"tool_name": "tool_name_here", "arguments": { ... }}\`
-    *   **Example:** \`{"tool_name": "update_schedule", "arguments": {"id": 3, "status": "Cancelled", "cancellationReason": "Trainer is sick."}}\`
+    *   **Example for update:** \`{"tool_name": "update_schedule", "arguments": {"id": 3, "status": "Cancelled", "cancellationReason": "Trainer is sick."}}\`
+    *   **Example for reminder:** \`{"tool_name": "update_schedule", "arguments": {"id": 1, "reminderMinutes": 15}}\`
 
 3.  **For all other conversational answers:** Respond ONLY with a single JSON object containing the answer and follow-up questions.
     *   **Format:** \`{"response": "Your HTML-formatted answer here.", "followUpQuestions": ["Suggested question 1?", "Suggested question 2?"]}\`
@@ -82,7 +80,7 @@ You have access to two tools:
 If you cannot perform a request, explain why in a conversational response, following rule #3.`;
     
     try {
-      const response: GenerateContentResponse = await this.ai.models.generateContent({
+      const response = await this.ai.models.generateContent({
           model: model,
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           config: {
@@ -121,11 +119,15 @@ If you cannot perform a request, explain why in a conversational response, follo
 
     } catch (error) {
       console.error('Error generating response from Gemini:', error);
-      return 'Sorry, I encountered an error. Please try again.';
+      const errorString = JSON.stringify(error) || '';
+      if (errorString.includes('403') || (error instanceof Error && error.message.includes('403'))) {
+        return "I'm having trouble connecting to the AI service due to a permission issue (Error 403). Please ask the administrator to verify that the API key is correct and has the necessary permissions enabled.";
+      }
+      return 'Sorry, I encountered an error communicating with the AI. Please try again later.';
     }
   }
 
-  private async handleToolCall(toolName: string, args: any): Promise<string> {
+  async handleToolCall(toolName, args) {
     if (toolName === 'update_schedule') {
         if (args.id) { // Update existing
             const existingItem = this.scheduleService.getSchedule().find(i => i.id === args.id);
@@ -134,9 +136,14 @@ If you cannot perform a request, explain why in a conversational response, follo
             }
             const updatedItem = { ...existingItem, ...args };
             this.scheduleService.updateScheduleItem(updatedItem);
+            
+            if (Object.keys(args).length === 2 && args.reminderMinutes !== undefined) {
+              return `OK, I've set a reminder for the "<b>${updatedItem.schoolName}</b>" session, ${args.reminderMinutes} minutes before it starts.`;
+            }
+            
             return `OK, I've updated the session for "<b>${updatedItem.trainer}</b>" at "<b>${updatedItem.schoolName}</b>".`;
         } else { // Add new
-            const newItem = args as Omit<ScheduleItem, 'id'>;
+            const newItem = args;
             this.scheduleService.addScheduleItem(newItem);
             return `OK, I've added the new session for "<b>${newItem.trainer}</b>" at "<b>${newItem.schoolName}</b>" to the schedule.`;
         }

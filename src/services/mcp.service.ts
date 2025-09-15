@@ -1,33 +1,98 @@
-
-import { Injectable, signal } from '@angular/core';
-
-interface Notification {
-  message: string | null;
-}
+import { Injectable, signal, OnDestroy } from '@angular/core';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 @Injectable({
   providedIn: 'root',
 })
-export class McpService {
-  notification = signal<Notification>({ message: null });
-  
-  // This simulates the client.callTool method from the user's example
-  async callTool(tool: { name: string, arguments: any }): Promise<{ status: string, message: string }> {
-    console.log(`Calling tool: ${tool.name} with args:`, tool.arguments);
-    
-    if (tool.name === 'send_notification') {
-      const message = tool.arguments.message || 'Notification sent!';
-      this.showNotification(message);
-      return { status: 'success', message: `Notification tool executed successfully.` };
-    }
+export class McpService implements OnDestroy {
+  notification = signal<{ message: string | null }>({ message: null });
+  isConnected = signal(false);
+  private client: Client;
+  private transport: StreamableHTTPClientTransport;
 
-    return { status: 'error', message: `Tool '${tool.name}' not found.` };
+  // This is the server URL provided by the user.
+  // CAUTION: This URL should be treated like a secret/password.
+  private readonly serverUrl = "https://mcp.zapier.com/api/mcp/s/NTUzNzljYzgtOGI0YS00MjJiLTlkODUtZGY1MzJmMmFiZDk1OjUxYjE0Y2JjLWZkYTUtNGJkMC1iMmRkLTAyMjkyMjQ3OTA5ZQ==/mcp";
+
+  constructor() {
+    this.client = new Client(
+      {
+        name: 'sg-school-trainer-hub-client',
+        version: '1.0.0',
+      },
+      {
+        capabilities: {},
+      }
+    );
+    this.transport = new StreamableHTTPClientTransport(new URL(this.serverUrl));
+    this.connect();
   }
 
-  private showNotification(message: string) {
+  async connect() {
+    try {
+      console.log("Connecting to MCP server...");
+      await this.client.connect(this.transport);
+      this.isConnected.set(true);
+      console.log("Connected to MCP server.");
+      
+      const tools = await this.client.listTools();
+      console.log("Available tools from MCP server:", tools);
+    } catch (error) {
+      console.error("Failed to connect to MCP server:", error);
+      this.isConnected.set(false);
+      this.showNotification("Error: Could not connect to the tool server.");
+    }
+  }
+
+  async callTool(tool: { name: string; arguments: any; }) {
+    if (!this.isConnected()) {
+        const errorMessage = "Cannot call tool: Not connected to the tool server.";
+        console.error(errorMessage);
+        this.showNotification(errorMessage);
+        return { status: 'error', message: errorMessage };
+    }
+    
+    console.log(`Calling tool via MCP: ${tool.name} with args:`, tool.arguments);
+    
+    try {
+        const result = await this.client.callTool({
+            name: tool.name,
+            arguments: tool.arguments,
+        });
+
+        console.log("MCP tool call result:", result);
+        
+        // The MCP server is responsible for sending the notification.
+        // We can show a local confirmation toast as well for better UX.
+        if (tool.name === 'send_notification') {
+            this.showNotification(tool.arguments.message || 'Notification request sent!');
+        }
+
+        // Assuming a successful call returns a result object with a `result` property.
+        return { status: 'success', message: result.result || `Tool '${tool.name}' executed successfully.` };
+
+    } catch (error) {
+        const errorMessage = `Error executing tool '${tool.name}' via MCP.`;
+        console.error(errorMessage, error);
+        this.showNotification(errorMessage);
+        return { status: 'error', message: errorMessage };
+    }
+  }
+
+  showNotification(message: string) {
     this.notification.set({ message });
     setTimeout(() => {
       this.notification.set({ message: null });
     }, 3000); // Hide after 3 seconds
+  }
+  
+  async ngOnDestroy() {
+    if (this.isConnected()) {
+        console.log("Closing MCP connection...");
+        await this.transport?.close();
+        await this.client?.close();
+        console.log("MCP connection closed.");
+    }
   }
 }
