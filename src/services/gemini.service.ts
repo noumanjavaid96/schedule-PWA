@@ -1,4 +1,5 @@
 
+
 import { Injectable, inject } from '@angular/core';
 import { GoogleGenAI, GenerateContentResponse, Type } from '@google/genai';
 import { ScheduleService } from './schedule.service';
@@ -83,12 +84,9 @@ If you cannot perform a request, explain why in a conversational response, follo
     try {
       const response: GenerateContentResponse = await this.ai.models.generateContent({
           model: model,
-          contents: prompt,
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
           config: {
             systemInstruction: systemInstruction,
-            // Pass the cancellable schedule to the model so it knows what to present
-            // This is a conceptual addition; actual implementation relies on the prompt.
-            // In a real scenario, this could be a tool the model calls. For now, it's in the main context.
           }
       });
       
