@@ -39,7 +39,7 @@ export class GeminiService {
       return "The AI assistant is currently unavailable. Please ensure the API key is configured correctly by the administrator.";
     }
 
-    const model = 'gemini-2.5-flash-lite';
+    const model = 'gemini-2.5-flash';
     const schedule = this.scheduleService.getSchedule();
     const cancellableSchedule = schedule.filter(item => item.status === 'Confirmed' || item.status === 'Pending');
     const scheduleContext = JSON.stringify(schedule, null, 2);
