@@ -1,0 +1,5 @@
+{
+  "name": "SG School Trainer Hub",
+  "description": "A scheduler for trainers providing services to schools in Singapore, with an integrated AI assistant.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,87 @@
+<div class="p-4 flex flex-col h-full">
+  <div #chatContainer class="flex-grow overflow-y-auto mb-4 space-y-6 pr-2 -mr-2">
+    @for (message of messages(); track $index) {
+      <div class="flex items-end gap-3" [class.flex-row-reverse]="message.role === 'user'">
+        <!-- Avatar -->
+        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold"
+             [class.bg-blue-500]="message.role === 'user'"
+             [class.bg-gray-400]="message.role === 'model'">
+          {{ message.role === 'user' ? 'U' : 'A' }}
+        </div>
+        
+        <!-- Message Bubble & Follow-ups -->
+        <div class="max-w-lg flex flex-col" [class.items-end]="message.role === 'user'" [class.items-start]="message.role === 'model'">
+          @if (message.isLoading) {
+            <div class="p-3 rounded-lg bg-gray-200 dark:bg-gray-700 rounded-bl-none">
+              <div class="flex items-center space-x-2">
+                <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse [animation-delay:0.2s]"></div>
+                <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse [animation-delay:0.4s]"></div>
+              </div>
+            </div>
+          } @else {
+            <div class="p-3 rounded-lg max-w-none" 
+                 [class.bg-blue-500]="message.role === 'user'" 
+                 [class.text-white]="message.role === 'user'" 
+                 [class.rounded-br-none]="message.role === 'user'"
+                 [class.bg-gray-200]="message.role === 'model'" 
+                 [class.dark:bg-gray-700]="message.role === 'model'" 
+                 [class.text-gray-800]="message.role === 'model'" 
+                 [class.dark:text-gray-200]="message.role === 'model'"
+                 [class.rounded-bl-none]="message.role === 'model'"
+                 [innerHTML]="message.content">
+            </div>
+          }
+
+          <!-- Interactive Actions -->
+          @if (message.action === 'PROMPT_FOR_CANCELLATION' && message.actionData) {
+            <div class="mt-3 w-full max-w-md space-y-2">
+              @for (session of message.actionData.sessions; track session.id) {
+                <button (click)="selectSession(session, 'cancel')" class="w-full text-left p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200 transform hover:scale-[1.02]">
+                  <div class="font-semibold text-gray-800 dark:text-gray-100">{{ session.schoolName }}</div>
+                  <div class="text-sm text-gray-500 dark:text-gray-400">{{ session.topic }} - {{ session.trainer }}</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ formatSessionDate(session.date) }} at {{ session.time }}</div>
+                </button>
+              }
+            </div>
+          }
+          
+          <!-- Follow-up Questions -->
+          @if (message.followUpQuestions && message.followUpQuestions.length > 0) {
+            <div class="mt-3 flex flex-wrap gap-2" [class.justify-start]="message.role === 'model'">
+              @for(question of message.followUpQuestions; track question) {
+                <button (click)="sendSuggestedQuestion(question)" class="text-xs text-blue-600 dark:text-blue-400 bg-blue-100/60 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-900/80 px-3 py-1.5 rounded-full transition-colors">
+                  {{ question }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="mt-auto pt-2 border-t border-gray-200 dark:border-gray-700">
+    <form (submit)="sendMessage()">
+      <div class="flex items-center space-x-2">
+        <input 
+          type="text"
+          [(ngModel)]="userInput"
+          [ngModelOptions]="{standalone: true}"
+          placeholder="e.g., Cancel the session for Alex Tan..."
+          class="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+          [disabled]="isLoading()"
+        />
+        <button 
+          type="submit"
+          class="bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:bg-blue-300 dark:disabled:bg-blue-800 disabled:cursor-not-allowed transition"
+          [disabled]="isLoading() || userInput().trim().length === 0"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+          </svg>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

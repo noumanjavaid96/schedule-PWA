@@ -1,0 +1,63 @@
+<div class="h-screen w-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex flex-col">
+  
+  <!-- Top Header -->
+  <header class="bg-white dark:bg-gray-800 p-4 shadow-md z-10 flex-shrink-0 flex items-center justify-between">
+    <div class="w-10"></div> <!-- Spacer -->
+    <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ title() }}</h1>
+    <button (click)="toggleDarkMode()" class="p-2 w-10 h-10 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500">
+      @if (isDarkMode()) {
+        <!-- Sun Icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      } @else {
+        <!-- Moon Icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      }
+    </button>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-grow overflow-hidden">
+    <div class="h-full" [hidden]="activeView() !== 'schedule'">
+      <app-schedule></app-schedule>
+    </div>
+    <div class="h-full" [hidden]="activeView() !== 'chat'">
+      <app-chat></app-chat>
+    </div>
+  </main>
+
+  <!-- Bottom Tab Navigation -->
+  <nav class="h-16 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-around items-center shadow-inner flex-shrink-0">
+    <!-- Schedule Button -->
+    <button (click)="setView('schedule')" class="flex flex-col items-center justify-center w-full h-full text-gray-500 dark:text-gray-400 transition-colors" [class.text-blue-600]="activeView() === 'schedule'" [class.dark:text-blue-400]="activeView() === 'schedule'">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+      </svg>
+      <span class="text-xs font-medium">Schedule</span>
+    </button>
+    <!-- Chat Button -->
+    <button (click)="setView('chat')" class="flex flex-col items-center justify-center w-full h-full text-gray-500 dark:text-gray-400 transition-colors" [class.text-blue-600]="activeView() === 'chat'" [class.dark:text-blue-400]="activeView() === 'chat'">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm1.5 1a.5.5 0 000 1h11a.5.5 0 000-1h-11zM3 9a.5.5 0 000 1h5a.5.5 0 000-1H3z" />
+      </svg>
+      <span class="text-xs font-medium">Assistant</span>
+    </button>
+  </nav>
+
+  <!-- Notification Toast -->
+  @if (notification(); as notif) {
+    <div class="absolute top-20 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-md transition-transform duration-300" 
+         [class.translate-x-full]="!notif.message"
+         [class.opacity-0]="!notif.message">
+      <div class="flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>{{ notif.message }}</span>
+      </div>
+    </div>
+  }
+</div>
