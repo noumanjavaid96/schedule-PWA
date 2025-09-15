@@ -13,7 +13,7 @@ export class McpService implements OnDestroy {
 
   // This is the server URL provided by the user.
   // CAUTION: This URL should be treated like a secret/password.
-  private readonly serverUrl = "https://corsproxy.io/?https://mcp.zapier.com/api/mcp/s/NTUzNzljYzgtOGI0YS00MjJiLTlkODUtZGY1MzJmMmFiZDk1OjUxYjE0Y2JjLWZkYTUtNGJkMC1iMmRkLTAyMjkyMjQ3OTA5ZQ==/mcp";
+  private readonly serverUrl = "https://corsproxy.io/?https://mcp.zapier.com/api/mcp/s/NTUzNzljYzgtOGI0YS00ZWEyLWIzMjEtZGY1MzJmMmFiZDk1OjUxYjE0Y2JjLWZkYTUtNGJkMC1iMmRkLTAyMjkyMjQ3OTA5ZQ==/mcp";
 
   constructor() {
     this.client = new Client(

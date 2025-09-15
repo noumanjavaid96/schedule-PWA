@@ -9,7 +9,7 @@ import { ChatMessage } from '../models/schedule.model.js';
   providedIn: 'root',
 })
 export class GeminiService {
-  ai = null;
+  ai: GoogleGenAI | null = null;
   apiKeyChecked = false; // Flag to prevent repeated checks
   scheduleService = inject(ScheduleService);
   mcpService = inject(McpService);
@@ -24,12 +24,22 @@ export class GeminiService {
     }
 
     this.apiKeyChecked = true;
-    // The API key is obtained exclusively from the environment variable `process.env.API_KEY`.
-    const apiKey = process.env.API_KEY;
+    // The API key is obtained exclusively from the environment.
+    // In a browser-only environment, `process` might not be defined. This code safely checks for it.
+    let apiKey: string | undefined;
+    try {
+        // This check is to prevent reference errors in browsers where `process` doesn't exist.
+        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+            apiKey = process.env.API_KEY;
+        }
+    } catch (e) {
+        console.warn('Could not access process.env.API_KEY. This is expected in some environments.', e);
+    }
+    
     if (apiKey) {
       this.ai = new GoogleGenAI({ apiKey });
     } else {
-      console.error("Gemini API Key not found in process.env.API_KEY. AI features will be disabled.");
+      console.error("Gemini API Key not found. AI features will be disabled. Ensure the API key is configured as an environment variable in your deployment service (e.g., Vercel).");
     }
   }
 
