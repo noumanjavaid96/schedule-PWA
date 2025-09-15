@@ -1,7 +1,8 @@
-import { Component, ChangeDetectionStrategy, inject, signal, viewChild, afterNextRender, ElementRef } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, viewChild, afterNextRender, ElementRef, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { GeminiService } from '../../services/gemini.service.js';
 import { ChatMessage, ScheduleItem } from '../../models/schedule.model.js';
+import { ChatCommsService } from '../../services/chat-comms.service.js';
 
 @Component({
   selector: 'app-chat',
@@ -11,6 +12,7 @@ import { ChatMessage, ScheduleItem } from '../../models/schedule.model.js';
 })
 export class ChatComponent {
   geminiService = inject(GeminiService);
+  chatCommsService = inject(ChatCommsService);
   
   messages = signal<ChatMessage[]>([
     { role: 'model', content: "Hello Admin! Welcome to the SG School Trainer Hub. You can manage all trainer schedules here. How can I assist you?", followUpQuestions: ["What's on the schedule for today?", "Are there any pending sessions?", "I need to cancel a session."] }
@@ -23,6 +25,14 @@ export class ChatComponent {
   constructor() {
     afterNextRender(() => {
       this.scrollToBottom();
+    });
+
+    effect(() => {
+        const message = this.chatCommsService.messageToSend();
+        if (message) {
+            this.processMessage(message);
+            this.chatCommsService.messageToSend.set(null); // Reset after processing
+        }
     });
   }
 
@@ -71,7 +81,8 @@ export class ChatComponent {
     this.scrollToBottom();
 
     try {
-      const response = await this.geminiService.generateResponse(message);
+      const historyForApi = this.messages().filter(m => !m.isLoading);
+      const response = await this.geminiService.generateResponse(historyForApi);
       
       let newModelMessage: ChatMessage;
 

@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed, effect } 
 import { ScheduleComponent } from './components/schedule/schedule.component.js';
 import { ChatComponent } from './components/chat/chat.component.js';
 import { McpService } from './services/mcp.service.js';
+import { ChatCommsService } from './services/chat-comms.service.js';
 
 @Component({
   selector: 'app-root',
@@ -10,8 +11,8 @@ import { McpService } from './services/mcp.service.js';
   imports: [ScheduleComponent, ChatComponent],
 })
 export class AppComponent {
-  mcpService = inject(McpService);
-  notification = this.mcpService.notification;
+  mcpService = inject(McpService); // Initialize MCP
+  chatCommsService = inject(ChatCommsService);
 
   activeView = signal('schedule');
   isDarkMode = signal(false);
@@ -36,5 +37,10 @@ export class AppComponent {
 
   toggleDarkMode() {
     this.isDarkMode.update(value => !value);
+  }
+  
+  handleScheduleAction(actionText: string) {
+    this.chatCommsService.messageToSend.set(actionText);
+    this.setView('chat');
   }
 }

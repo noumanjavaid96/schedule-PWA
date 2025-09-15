@@ -22,7 +22,7 @@
   <!-- Main Content -->
   <main class="flex-grow overflow-hidden">
     <div class="h-full" [hidden]="activeView() !== 'schedule'">
-      <app-schedule></app-schedule>
+      <app-schedule (actionClicked)="handleScheduleAction($event)"></app-schedule>
     </div>
     <div class="h-full" [hidden]="activeView() !== 'chat'">
       <app-chat></app-chat>
@@ -46,18 +46,4 @@
       <span class="text-xs font-medium">Assistant</span>
     </button>
   </nav>
-
-  <!-- Notification Toast -->
-  @if (notification(); as notif) {
-    <div class="absolute top-20 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-md transition-transform duration-300" 
-         [class.translate-x-full]="!notif.message"
-         [class.opacity-0]="!notif.message">
-      <div class="flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span>{{ notif.message }}</span>
-      </div>
-    </div>
-  }
 </div>

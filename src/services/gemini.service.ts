@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { GoogleGenAI } from '@google/genai';
 import { ScheduleService } from './schedule.service.js';
 import { McpService } from './mcp.service.js';
+import { ChatMessage } from '../models/schedule.model.js';
 
 // IMPORTANT: This service assumes the API key is available via process.env.API_KEY
 @Injectable({
@@ -32,7 +33,7 @@ export class GeminiService {
     }
   }
 
-  async generateResponse(prompt) {
+  async generateResponse(chatHistory: ChatMessage[]) {
     this.initializeAi(); // Initialize AI client just-in-time
 
     if (!this.ai) {
@@ -54,10 +55,10 @@ SCHEDULE:
 ${scheduleContext}
 
 You have access to two tools:
-1. 'update_schedule': Use this to add, modify, or delete a training session. The arguments object should match the ScheduleItem structure. For modifications, you MUST provide the 'id'. To set a reminder, provide the 'id' and 'reminderMinutes' (e.g., {"id": 2, "reminderMinutes": 30}).
+1. 'update_schedule': Use this to add, modify, or delete a training session. The arguments object should match the ScheduleItem structure which includes fields like 'schoolName', 'topic', 'date', 'time', 'status', 'trainer', 'location', and 'notes'. For modifications, you MUST provide the 'id'. To set a reminder, provide the 'id' and 'reminderMinutes' (e.g., {"id": 2, "reminderMinutes": 30}).
    - **CRITICAL CANCELLATION RULE:** If a user requests to cancel a session, you MUST ask for a detailed reason for the cancellation before using this tool.
+2. 'send_notification': Sends a simple success notification to the UI. Use it to confirm actions like setting a reminder. Example: {"tool_name": "send_notification", "arguments": {"message": "Reminder set!"}}
 
-2. 'send_notification': Use this to send a notification to the user.
 
 **Response Formatting and Action Rules:**
 
@@ -66,23 +67,29 @@ You have access to two tools:
     *   **Format:** \`{"action": "PROMPT_FOR_CANCELLATION", "data": {"prompt": "Which session would you like to cancel?", "sessions": [...]}}\`
     *   The "sessions" array MUST contain the list of all "Confirmed" and "Pending" sessions from the schedule context.
 
-2.  **If you need to use a tool:** Respond ONLY with a single JSON object for the tool call.
-    *   **Format:** \`{"tool_name": "tool_name_here", "arguments": { ... }}\`
-    *   **Example for update:** \`{"tool_name": "update_schedule", "arguments": {"id": 3, "status": "Cancelled", "cancellationReason": "Trainer is sick."}}\`
-    *   **Example for reminder:** \`{"tool_name": "update_schedule", "arguments": {"id": 1, "reminderMinutes": 15}}\`
+2.  **If you need to use a tool:** Respond ONLY with a single JSON object for the tool call, OR a JSON array of tool call objects if multiple actions are required (e.g., "confirm all pending sessions").
+    *   **Single Tool Call Format:** \`{"tool_name": "tool_name_here", "arguments": { ... }}\`
+    *   **Multiple Tool Calls Format:** \`[{"tool_name": "update_schedule", "arguments": {"id": 3, "status": "Confirmed"}}, {"tool_name": "update_schedule", "arguments": {"id": 6, "status": "Confirmed"}}]\`
 
 3.  **For all other conversational answers:** Respond ONLY with a single JSON object containing the answer and follow-up questions.
-    *   **Format:** \`{"response": "Your HTML-formatted answer here.", "followUpQuestions": ["Suggested question 1?", "Suggested question 2?"]}\`
+    *   **Format:** \`{"response": "Your HTML-formatted answer here.", "followUpQuestions": [...]}\`
     *   **\`response\` field:** Format content using simple HTML tags (\`<b>\`, \`<i>\`, \`<ul><li>\`). Do not use markdown. **CRITICAL:** Ensure all HTML tags are correctly formed and closed to prevent display issues.
-    *   **\`followUpQuestions\` field:** Provide 2-3 short, relevant follow-up questions.
-    *   **Example:** \`{"response": "Yes, everything is on schedule except for the session at <b>National Junior College</b>.", "followUpQuestions": ["Can you confirm the NJC session?", "What is my schedule for tomorrow?"]}\`
+    *   **\`followUpQuestions\` field:** Provide 2-3 short, relevant follow-up questions. If a question is about a specific session from the SCHEDULE context, you MUST include its 'id' in a 'sessionId' field (e.g., {"text": "Confirm this session?", "sessionId": 3}). General questions should not have a 'sessionId'.
+    *   **Example:** \`{"response": "Yes, everything is on schedule except for the session at <b>National Junior College</b>.", "followUpQuestions": [{"text": "Can you confirm the NJC session?", "sessionId": 3}, {"text": "What is my schedule for tomorrow?"}]}\`
 
 If you cannot perform a request, explain why in a conversational response, following rule #3.`;
-    
+
+    const contents = chatHistory
+      .filter(m => (m.role === 'user' || m.role === 'model') && m.content)
+      .map(m => ({
+        role: m.role,
+        parts: [{ text: m.content }]
+      }));
+      
     try {
       const response = await this.ai.models.generateContent({
           model: model,
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          contents: contents,
           config: {
             systemInstruction: systemInstruction,
             responseMimeType: "application/json", // Enforce JSON output
@@ -94,21 +101,47 @@ If you cannot perform a request, explain why in a conversational response, follo
       try {
         const jsonResponse = JSON.parse(responseText);
         
+        // HANDLE BATCH TOOL CALLS (Array of tools)
+        if (Array.isArray(jsonResponse) && jsonResponse.every(item => item.tool_name && item.arguments)) {
+          const toolPromises = jsonResponse.map(tool => this.handleToolCall(tool.tool_name, tool.arguments));
+          const toolResults = await Promise.all(toolPromises);
+          
+          const summary = `I've completed the following actions:<ul>${toolResults.map(res => `<li>${res}</li>`).join('')}</ul>`;
+          
+          return {
+            response: summary,
+            followUpQuestions: ["Is there anything else I can help with?", "Show me the updated schedule."]
+          };
+        }
+
+        // HANDLE SINGLE TOOL CALL
+        if (jsonResponse.tool_name && jsonResponse.arguments) {
+          const result = await this.handleToolCall(jsonResponse.tool_name, jsonResponse.arguments);
+          return {
+            response: result,
+            followUpQuestions: ["What else can I do for you?", "Show me my schedule for today."]
+          };
+        }
+        
         if (jsonResponse.action === 'PROMPT_FOR_CANCELLATION' && jsonResponse.data) {
-            // Pass only the relevant sessions to the UI
           jsonResponse.data.sessions = cancellableSchedule;
           return jsonResponse;
         }
         
-        if (jsonResponse.tool_name && jsonResponse.arguments) {
-          return await this.handleToolCall(jsonResponse.tool_name, jsonResponse.arguments);
-        }
-        
         if (jsonResponse.response && Array.isArray(jsonResponse.followUpQuestions)) {
-          return jsonResponse;
+            this.scheduleService.clearAllSuggestedActions();
+            const generalFollowUps = [];
+            for (const q of jsonResponse.followUpQuestions) {
+                if (q.sessionId) {
+                    this.scheduleService.addSuggestedActions(q.sessionId, [{ text: q.text }]);
+                } else {
+                    generalFollowUps.push(q.text || q);
+                }
+            }
+            jsonResponse.followUpQuestions = generalFollowUps;
+            return jsonResponse;
         }
         
-        // Fallback for valid JSON that doesn't match our expected structures
         console.error('AI returned valid JSON but with an unknown format:', jsonResponse);
         return `Sorry, I received an unexpected response from the AI. Please try rephrasing your request.`;
 
@@ -138,18 +171,21 @@ If you cannot perform a request, explain why in a conversational response, follo
             this.scheduleService.updateScheduleItem(updatedItem);
             
             if (Object.keys(args).length === 2 && args.reminderMinutes !== undefined) {
-              return `OK, I've set a reminder for the "<b>${updatedItem.schoolName}</b>" session, ${args.reminderMinutes} minutes before it starts.`;
+              const message = `Reminder set for the "${updatedItem.schoolName}" session.`;
+              this.mcpService.sendNotification(message);
+              return `Set a reminder for the "<b>${updatedItem.schoolName}</b>" session, ${args.reminderMinutes} minutes before it starts.`;
             }
             
-            return `OK, I've updated the session for "<b>${updatedItem.trainer}</b>" at "<b>${updatedItem.schoolName}</b>".`;
+            return `Updated the session for "<b>${updatedItem.trainer}</b>" at "<b>${updatedItem.schoolName}</b>".`;
         } else { // Add new
             const newItem = args;
             this.scheduleService.addScheduleItem(newItem);
-            return `OK, I've added the new session for "<b>${newItem.trainer}</b>" at "<b>${newItem.schoolName}</b>" to the schedule.`;
+            return `Added the new session for "<b>${newItem.trainer}</b>" at "<b>${newItem.schoolName}</b>" to the schedule.`;
         }
-    } else if (toolName === 'send_notification') {
-        const result = await this.mcpService.callTool({ name: 'send_notification', arguments: args });
-        return result.message;
+    }
+    if (toolName === 'send_notification') {
+        this.mcpService.sendNotification(args.message);
+        return `Sent the notification: "${args.message}"`;
     }
     return `Unknown tool: ${toolName}`;
   }

@@ -8,6 +8,9 @@ export interface ScheduleItem {
   trainer: string;
   cancellationReason?: string;
   reminderMinutes?: number;
+  suggestedActions?: { text: string }[];
+  location?: string;
+  notes?: string;
 }
 
 export interface ChatMessage {

@@ -45,6 +45,13 @@ export class McpService implements OnDestroy {
     }
   }
 
+  // This is a convenience wrapper for the 'send_notification' tool.
+  sendNotification(message: string) {
+    // This is a fire-and-forget call for UI purposes.
+    // We don't need to wait for the result in the Gemini service.
+    this.callTool({ name: 'send_notification', arguments: { message } });
+  }
+
   async callTool(tool: { name: string; arguments: any; }) {
     if (!this.isConnected()) {
         const errorMessage = "Cannot call tool: Not connected to the tool server.";
